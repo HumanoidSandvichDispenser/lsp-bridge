@@ -8,7 +8,10 @@
     "settings": { },
     "initializationOptions": {
         "preferences": {
-            "includeCompletionsForModuleExports": true
+            "quotePreference": "double",
+            "includeCompletionsForModuleExports": true,
+            "includeCompletionsForImportStatements": true,
+            "allowIncompleteCompletions": true
         }
     }
 }
