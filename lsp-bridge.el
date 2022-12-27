@@ -117,6 +117,7 @@
                                                     lsp-bridge-not-match-stop-commands
                                                     lsp-bridge-not-complete-manually
                                                     lsp-bridge-not-follow-complete
+                                                    lsp-bridge-not-execute-macro
                                                     lsp-bridge-not-in-string
                                                     lsp-bridge-not-in-org-table
                                                     lsp-bridge-not-in-multiple-cursors
@@ -243,13 +244,8 @@ Setting this to nil or 0 will turn off the indicator."
                                                                      (file-name-directory load-file-name)
                                                                    default-directory)))
 
-(defvar lsp-bridge-mark-ring nil
+(defvar-local lsp-bridge-mark-ring nil
   "The list of saved lsp-bridge marks, most recent first.")
-
-(defcustom lsp-bridge-mark-ring-max 16
-  "Maximum size of lsp-bridge mark ring.  \
-Start discarding off end if gets this big."
-  :type 'integer)
 
 (defvar lsp-bridge-server-port nil)
 
@@ -368,14 +364,14 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
 
 (defcustom lsp-bridge-single-lang-server-mode-list
   '(
-    ((c-mode c++-mode objc-mode) . lsp-bridge-c-lsp-server)
+    ((c-mode c-ts-mode c++-mode c++-ts-mode objc-mode) . lsp-bridge-c-lsp-server)
     (cmake-mode . "cmake-language-server")
     (java-mode . "jdtls")
     (python-mode . lsp-bridge-python-lsp-server)
     (ruby-mode . "solargraph")
-    ((rust-mode rustic-mode) . "rust-analyzer")
+    ((rust-mode rustic-mode rust-ts-mode) . "rust-analyzer")
     (elixir-mode . "elixirLS")
-    (go-mode . "gopls")
+    ((go-mode go-ts-mode) . "gopls")
     (groovy-mode . "groovy-language-server")
     (haskell-mode . "hls")
     (lua-mode . "sumneko")
@@ -392,7 +388,7 @@ Then LSP-Bridge will start by gdb, please send new issue with `*lsp-bridge*' buf
     ((css-mode) . "vscode-css-language-server")
     (elm-mode . "elm-language-server")
     (php-mode . lsp-bridge-php-lsp-server)
-    (yaml-mode . "yaml-language-server")
+    ((yaml-mode yaml-ts-mode) . "yaml-language-server")
     (zig-mode . "zls")
     (dockerfile-mode . "docker-langserver")
     (d-mode . "serve-d")
@@ -944,6 +940,10 @@ So we build this macro to restore postion after code format."
      (and (thing-at-point 'filename)
           (file-exists-p (file-name-directory (thing-at-point 'filename)))))))
 
+(defun lsp-bridge-not-execute-macro ()
+  "Hide completion during executing macros."
+  (not executing-kbd-macro))
+
 (defun lsp-bridge-not-in-mark-macro ()
   "Hide completion markmacro enable."
   (not (and (featurep 'markmacro)
@@ -1172,7 +1172,7 @@ So we build this macro to restore postion after code format."
   (interactive)
   ;; Pop entries that refer to non-existent buffers.
   (while (and lsp-bridge-mark-ring (not (marker-buffer (car lsp-bridge-mark-ring))))
-    (setq lsp-bridge-mark-ring (cdr lsp-bridge-mark-ring)))
+    (setq-local lsp-bridge-mark-ring (cdr lsp-bridge-mark-ring)))
   (or lsp-bridge-mark-ring
       (error "[LSP-Bridge] No lsp-bridge mark set"))
   (let* ((this-buffer (current-buffer))
@@ -1271,24 +1271,30 @@ So we build this macro to restore postion after code format."
   (setq-local lsp-bridge-prohibit-completion t))
 
 (defun lsp-bridge-define--jump (filepath position)
-  ;; Record postion.
-  (set-marker (mark-marker) (point) (current-buffer))
-  (add-to-history 'lsp-bridge-mark-ring (copy-marker (mark-marker)) lsp-bridge-mark-ring-max t)
+  (let (position-before-jump)
+    ;; Record postion.
+    (set-marker (mark-marker) (point) (current-buffer))
+    (setq position-before-jump (copy-marker (mark-marker)))
+    (setq mark-ring lsp-bridge-mark-ring)
 
-  ;; Jump to define.
-  ;; Show define in other window if `lsp-bridge-jump-to-def-in-other-window' is non-nil.
-  (if lsp-bridge-jump-to-def-in-other-window
-      (find-file-other-window filepath)
-    (find-file filepath))
+    ;; Jump to define.
+    ;; Show define in other window if `lsp-bridge-jump-to-def-in-other-window' is non-nil.
+    (if lsp-bridge-jump-to-def-in-other-window
+        (find-file-other-window filepath)
+      (find-file filepath))
 
-  (goto-char (acm-backend-lsp-position-to-point position))
-  (recenter)
+    ;; Init jump history in new buffer.
+    (setq-local lsp-bridge-mark-ring (append (list position-before-jump) mark-ring))
 
-  ;; Flash define line.
-  (require 'pulse)
-  (let ((pulse-iterations 1)
-        (pulse-delay lsp-bridge-flash-line-delay))
-    (pulse-momentary-highlight-one-line (point) 'lsp-bridge-font-lock-flash)))
+    ;; Jump to define postion.
+    (goto-char (acm-backend-lsp-position-to-point position))
+    (recenter)
+
+    ;; Flash define line.
+    (require 'pulse)
+    (let ((pulse-iterations 1)
+          (pulse-delay lsp-bridge-flash-line-delay))
+      (pulse-momentary-highlight-one-line (point) 'lsp-bridge-font-lock-flash))))
 
 (defun lsp-bridge-popup-documentation-scroll-up (&optional arg)
   (interactive)
