@@ -49,26 +49,28 @@ It should be noted that there are three scan modes of lsp-bridge:
 3. Custom `lsp-bridge-get-project-path-by-filepath` function, the input parameter is the path string of opened file, the output parameter is the project directory path, lsp-bridge will scan project directory path to provide provide completion
 
 ## Keymap
-| Key          | Command                   | Description                                                                  |
-| :---         | :---                      | :---                                                                         |
-| Alt + n      | acm-select-next           | Select next candidate                                                        |
-| Down         | acm-select-next           | Select next candidate                                                        |
-| Alt + p      | acm-select-prev           | Select previous candidate                                                    |
-| Up           | acm-select-prev           | Select previous candidate                                                    |
-| Alt + .      | acm-select-last           | Select last candidate                                                        |
-| Alt + ,      | acm-select-first          | Select first candidate                                                       |
-| Ctrl + m     | acm-complete              | Complete completion                                                          |
-| Return       | acm-complete              | Complete completion                                                          |
-| Tab          | acm-complete              | Complete completion                                                          |
-| Alt + h      | acm-complete              | Complete completion                                                          |
-| Alt + H      | acm-insert-common         | Insert common part of candidates                                             |
-| Alt + u      | acm-filter                | Filter candidates with overlay string                                        |
-| Alt + d      | acm-doc-toggle            | Enable or disable candidate documentation                                    |
-| Alt + j      | acm-doc-scroll-up         | Scroll up candidate documentation                                            |
-| Alt + k      | acm-doc-scroll-down       | Scroll down candidate documentation                                          |
-| Alt + l      | acm-hide                  | Hide completion menu                                                         |
-| Ctrl + g     | acm-hide                  | Hide completion menu                                                         |
-| Alt + Number | acm-complete-quick-access | Selecting candidate quickly, you need enable `acm-enable-quick-access` first |
+| Key            | Command                     | Description                                                                    |
+| :------------- | :-------------------------- | :----------------------------------------------------------------------------- |
+| Alt + n        | acm-select-next             | Select next candidate                                                          |
+| Down           | acm-select-next             | Select next candidate                                                          |
+| Alt + p        | acm-select-prev             | Select previous candidate                                                      |
+| Up             | acm-select-prev             | Select previous candidate                                                      |
+| Alt + ,        | acm-select-last             | Select last candidate                                                          |
+| Alt + .        | acm-select-first            | Select first candidate                                                         |
+| Ctrl + v       | acm-select-next-page        | Select next page candidate                                                     |
+| Alt + v        | acm-select-prev-page        | Select previous page candidate                                                 |
+| Ctrl + m       | acm-complete                | Complete completion                                                            |
+| Return         | acm-complete                | Complete completion                                                            |
+| Tab            | acm-complete                | Complete completion                                                            |
+| Alt + h        | acm-complete                | Complete completion                                                            |
+| Alt + H        | acm-insert-common           | Insert common part of candidates                                               |
+| Alt + u        | acm-filter                  | Filter candidates with overlay string                                          |
+| Alt + d        | acm-doc-toggle              | Enable or disable candidate documentation                                      |
+| Alt + j        | acm-doc-scroll-up           | Scroll up candidate documentation                                              |
+| Alt + k        | acm-doc-scroll-down         | Scroll down candidate documentation                                            |
+| Alt + l        | acm-hide                    | Hide completion menu                                                           |
+| Ctrl + g       | acm-hide                    | Hide completion menu                                                           |
+| Alt + Number   | acm-complete-quick-access   | Selecting candidate quickly, you need enable `acm-enable-quick-access` first   |
 
 
 ## Commands
@@ -88,6 +90,7 @@ It should be noted that there are three scan modes of lsp-bridge:
 * `lsp-bridge-diagnostic-list`: List all diagnostic information
 * `lsp-bridge-diagnostic-copy`: Copy the current diagnostic information to the clipboard
 * `lsp-bridge-diagnostic-ignore`: Insert comment to ignore the current diagnosis
+* `lsp-bridge-code-action`: Popup code action menu, you can pass special `actin-kind` to fix, `action-kind` can use one of "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports", "source.fixAll"
 * `lsp-bridge-workspace-list-symbols`: List all symbols in workspace and jump to the symbol definition
 * `lsp-bridge-signature-help-fetch`: show signature help in minibuffer manually (move cursor to parameters area will show signature help automatically)
 * `lsp-bridge-popup-complete-menu`: Manually popup the completion menu, you only need this command when turn on option `lsp-bride-complete-manually`
@@ -122,6 +125,8 @@ It should be noted that there are three scan modes of lsp-bridge:
 * `lsp-bridge-completion-popup-predicates`: the predicate function for completion menu, completion menu popup after all the functions pass
 * `lsp-bridge-completion-stop-commands`: completion menu will not popup if these commands are executed
 * `lsp-bridge-completion-hide-characters`: completion menu will not popup when cursor after those characters
+* `acm-frame-background-dark-color`: Menu background color in dark theme
+* `acm-frame-background-light-color`: Menu background color in light theme
 * `acm-markdown-render-font-height`: The font height of function documentation, default is 130
 * `acm-enable-doc`: Whether the complete menu display the help document
 * `acm-enable-doc-markdown-render`: Richly render Markdown for completion popups, you can choose `'async`, `t` or `nil`. When set to `'async`, styles are applied asynchronously, choose `t`, styles are applied synchronously and will slow down the completion speed, default is `async`
@@ -207,7 +212,7 @@ You need to install the LSP server corresponding to each programming language, t
 | [eclipse.jdt.ls](https://projects.eclipse.org/projects/eclipse.jdt.ls)                               | Java                                    | Please ensure that `org.eclipse.jdt.ls.product/target/repository/bin` is in your system PATH at first                                                                                     |
 | [clojure-lsp](https://github.com/clojure-lsp/clojure-lsp)                                            | Clojure                                 | If you use `homebrew` , please ensure install `clojure-lsp/brew/clojure-lsp-native` [clojure-lsp-native](https://clojure-lsp.io/installation/#homebrew-macos-and-linux)                   |
 | [bash-language-server](https://github.com/bash-lsp/bash-language-server)                             | Bash                                    |                                                                                                                                                                                           |
-| [volar](https://github.com/johnsoncodehk/volar)                                                      | Vue                                     | npm install -g typescript @volar/vue-language-server -g                                                                                                                                   |
+| [volar](https://github.com/johnsoncodehk/volar)                                                      | Vue                                     | `npm install -g typescript @volar/vue-language-server`                                                                                                                                    |
 | [sumneko](https://github.com/sumneko/lua-language-server)                                            | Lua                                     | Please ensure `bin` under sumneko installation is in your system PATH at first                                                                                                            |
 | [wxml-language-server](https://github.com/chemzqm/wxml-languageserver)                               | Wxml                                    |                                                                                                                                                                                           |
 | [vscode-html-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)               | HTML                                    | `npm i -g vscode-langservers-extracted`                                                                                                                                                   |
@@ -230,7 +235,8 @@ You need to install the LSP server corresponding to each programming language, t
 | [rlanguageserver](https://github.com/REditorSupport/languageserver)                                  | R                                       |                                                                                                                                                                                           |
 | [graphql-lsp](https://github.com/graphql/graphiql/tree/main/packages/graphql-language-service-cli)   | GraphQL                                 |                                                                                                                                                                                           |
 | [cmake-language-server](https://github.com/regen100/cmake-language-server)                           | Cmake                                   | `pip install cmake-language-server`                                                                                                                                                       |
-| [Wen](https://github.com/metaescape/Wen)                                                             | Org-mode                                | `pip install pygls pypinyin`                                                                                                                                                              |
+| [ds-pinyin](https://github.com/iamcco/ds-pinyin-lsp)                                                 | Org-mode                                | `cargo install ds-pinyin-lsp`, download dict.db3 of ds-pinyin, and save to ~/.emacs.d/ds-pinyin/ directory, then turn on option `lsp-bridge-use-ds-pinyin-in-org-mode`                                                    |
+| [Wen](https://github.com/metaescape/Wen)                                                             | Org-mode                                | `pip install pygls pypinyin`, then turn on option `lsp-bridge-use-wenls-in-org-mode`                                                                                                                                      |
 | [sourcekit-lsp](https://github.com/apple/sourcekit-lsp)                                              | Swift                                   | The SourceKit-LSP server is included with the Swift toolchain.                                                                                                                            |
 | [omnisharp-mono](https://github.com/OmniSharp/omnisharp-roslyn)                                      | C#                                      | OmniSharp is a .NET development platform based on Roslyn workspaces. use `M-x lsp-bridge-install-omnisharp` to install it. `lsp-bridge-csharp-lsp-server` set to `omnisharp-mono`         |
 | [omnisharp-dotnet](https://github.com/OmniSharp/omnisharp-roslyn)                                    | C#                                      | OmniSharp is a .NET development platform based on Roslyn workspaces. use `M-x lsp-bridge-install-omnisharp` to install it. `lsp-bridge-csharp-lsp-server` set to `omnisharp-dotnet` (6.0) |
@@ -316,6 +322,8 @@ Generally, `lsp-bridge-example-record` is defined in this way. After receiving `
 6. Show performance bottlenecks: snakeviz ~/lsp-bridge.prof
 
 ## Report bug
+
+For some common problems, please read [Wiki](https://github.com/manateelazycat/lsp-bridge/wiki) first.
 
 Please use `emacs -q` and load a minimal setup with only lsp-bridge to verify that the bug is reproducible. If `emacs -q` works fine, probably something is wrong with your Emacs config.
 

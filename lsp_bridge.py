@@ -38,6 +38,7 @@ from core.search_file_words import SearchFileWords
 from core.search_sdcv_words import SearchSdcvWords
 from core.search_list import SearchList
 from core.search_tailwindcss_keywords import SearchTailwindKeywords
+from core.search_paths import SearchPaths
 from core.tabnine import TabNine
 from core.utils import *
 from core.handler import *
@@ -96,6 +97,11 @@ class LspBridge:
         self.search_tailwind_keywords = SearchTailwindKeywords()
         for name in ["search"]:
             self.build_prefix_function("search_tailwind_keywords", "search_tailwind_keywords", name)
+
+        # Init search paths.
+        self.search_paths = SearchPaths()
+        for name in ["search"]:
+            self.build_prefix_function("search_paths", "search_paths", name)
             
         # Init emacs option.
         enable_lsp_server_log = get_emacs_var("lsp-bridge-enable-log")
@@ -213,29 +219,35 @@ class LspBridge:
     def turn_off(self, filepath, message):
         message_emacs(message)
         eval_in_emacs("lsp-bridge--turn-off", filepath)
-    
+
+    def replace_template(self, arg):
+        if "%USER_EMACS_DIRECTORY%" in arg:
+            user_emacs_dir = get_emacs_func_result("get-user-emacs-directory").replace("/", "\\")
+            return arg.replace("%USER_EMACS_DIRECTORY%", user_emacs_dir)
+        elif "$HOME" in arg:
+                return os.path.expandvars(arg)
+        elif "%FILEHASH%" in arg:
+            # pyright use `--cancellationReceive` option enable "background analyze" to improve completion performance.
+            return arg.replace("%FILEHASH%", os.urandom(21).hex())
+        elif "%USERPROFILE%" in arg:
+            return arg.replace("%USERPROFILE%", windows_get_env_value("USERPROFILE"))
+        else:
+            return arg
+
     def server_info_replace_template(self, lang_server_info):
         # Replace template in command options.
         command_args = lang_server_info["command"]
         for i, arg in enumerate(command_args):
-            if "%USER_EMACS_DIRECTORY%" in arg:
-                user_emacs_dir = get_emacs_func_result("get-user-emacs-directory").replace("/", "\\")
-                command_args[i] = arg.replace("%USER_EMACS_DIRECTORY%", user_emacs_dir)
-            elif "$HOME" in arg:
-                command_args[i] = os.path.expandvars(arg)
-            elif "%FILEHASH%" in arg:
-                # pyright use `--cancellationReceive` option enable "background analyze" to improve completion performance.
-                command_args[i] = arg.replace("%FILEHASH%", os.urandom(21).hex())
+            command_args[i] = self.replace_template(arg)
         lang_server_info["command"] = command_args
-        
+
         # Replace template in initializationOptions.
-        initialize_args = lang_server_info.get("initializationOptions", None)
-        if initialize_args:
-            initialize_args_string = json.dumps(initialize_args)
-            if "%USERPROFILE%" in initialize_args_string:
-                initialize_args_string.replace("%USERPROFILE%", windows_get_env_value("USERPROFILE"))
-                initialize_args = json.load(initialize_args_string)
-                lang_server_info["initializationOptions"] = initialize_args
+        if "initializationOptions" in lang_server_info:
+            initialization_options_args = lang_server_info["initializationOptions"]
+            for i, arg in enumerate(initialization_options_args):
+                if type(initialization_options_args[arg]) == str:
+                    initialization_options_args[arg] = self.replace_template(initialization_options_args[arg])
+            lang_server_info["initializationOptions"] = initialization_options_args
 
         return lang_server_info
         

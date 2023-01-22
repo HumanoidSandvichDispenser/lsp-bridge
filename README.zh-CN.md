@@ -48,26 +48,28 @@ lsp-bridge 开箱即用， 安装好语言对应的[LSP 服务器](https://githu
 3. 自定义 `lsp-bridge-get-project-path-by-filepath` 函数， 输入参数是打开文件的路径字符串， 输出参数是项目目录路径， lsp-bridge 会根据输出目录路径来提供补全
 
 ## 按键
-| 按键         | 命令                      | 备注                                                     |
-| :---         | :---                      | :---                                                     |
-| Alt + n      | acm-select-next           | 选择下一个后选词                                         |
-| Down         | acm-select-next           | 选择下一个后选词                                         |
-| Alt + p      | acm-select-prev           | 选择上一个后选词                                         |
-| Up           | acm-select-prev           | 选择上一个后选词                                         |
-| Alt + .      | acm-select-last           | 选择最后一个后选词                                       |
-| Alt + ,      | acm-select-first          | 选择第一个后选词                                         |
-| Ctrl + m     | acm-complete              | 完成补全                                                 |
-| Return       | acm-complete              | 完成补全                                                 |
-| Tab          | acm-complete              | 完成补全                                                 |
-| Alt + h      | acm-complete              | 完成补全                                                 |
-| Alt + H      | acm-insert-common         | 插入后选词共有部分                                       |
-| Alt + u      | acm-filter                | 用 Overlay 进一步过滤后选词                              |
-| Alt + d      | acm-doc-toggle            | 开启或关闭后选词文档                                     |
-| Alt + j      | acm-doc-scroll-up         | 向下滚动后选词文档                                       |
-| Alt + k      | acm-doc-scroll-down       | 向上滚动后选词文档                                       |
-| Alt + l      | acm-hide                  | 隐藏补全窗口                                             |
-| Ctrl + g     | acm-hide                  | 隐藏补全窗口                                             |
-| Alt + 数字键 | acm-complete-quick-access | 快速选择后选词， 需要开启 `acm-enable-quick-access` 选项  |
+| 按键           | 命令                        | 备注                                                       |
+| :------------- | :-------------------------- | :--------------------------------------------------------- |
+| Alt + n        | acm-select-next             | 选择下一个候选词                                           |
+| Down           | acm-select-next             | 选择下一个候选词                                           |
+| Alt + p        | acm-select-prev             | 选择上一个候选词                                           |
+| Up             | acm-select-prev             | 选择上一个候选词                                           |
+| Alt + ,        | acm-select-last             | 选择最后一个候选词                                         |
+| Alt + .        | acm-select-first            | 选择第一个候选词                                           |
+| Ctrl + v       | acm-select-next-page        | 向下滚动候选菜单                                           |
+| Alt + v        | acm-select-prev-page        | 向上滚动候选菜单                                           |
+| Ctrl + m       | acm-complete                | 完成补全                                                   |
+| Return         | acm-complete                | 完成补全                                                   |
+| Tab            | acm-complete                | 完成补全                                                   |
+| Alt + h        | acm-complete                | 完成补全                                                   |
+| Alt + H        | acm-insert-common           | 插入候选词共有部分                                         |
+| Alt + u        | acm-filter                  | 用 Overlay 进一步过滤候选词                                |
+| Alt + d        | acm-doc-toggle              | 开启或关闭候选词文档                                       |
+| Alt + j        | acm-doc-scroll-up           | 向下滚动候选词文档                                         |
+| Alt + k        | acm-doc-scroll-down         | 向上滚动候选词文档                                         |
+| Alt + l        | acm-hide                    | 隐藏补全窗口                                               |
+| Ctrl + g       | acm-hide                    | 隐藏补全窗口                                               |
+| Alt + 数字键   | acm-complete-quick-access   | 快速选择候选词， 需要开启 `acm-enable-quick-access` 选项   |
 
 ## 命令列表
 
@@ -86,12 +88,13 @@ lsp-bridge 开箱即用， 安装好语言对应的[LSP 服务器](https://githu
 * `lsp-bridge-diagnostic-list`: 列出所有诊断信息
 * `lsp-bridge-diagnostic-copy`: 拷贝当前诊断信息到剪切板
 * `lsp-bridge-diagnostic-ignore`: 插入注视忽略当前诊断
+* `lsp-bridge-code-action`: 弹出代码修复菜单, 也可以指需要修复的代码动作类型: "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports", "source.fixAll"
 * `lsp-bridge-workspace-list-symbols`: 列出工作区所有符号，并跳转到符号定义
 * `lsp-bridge-signature-help-fetch`: 在 minibuffer 显示参数信息
 * `lsp-bridge-popup-complete-menu`: 手动弹出补全菜单， 只有当打开 `lsp-bridge-complete-manually` 选项才需要使用这个命令
 * `lsp-bridge-restart-process`: 重启 lsp-bridge 进程 (一般只有开发者才需要这个功能)
 * `lsp-bridge-toggle-sdcv-helper`: 切换字典助手补全
-* `acm-insert-common`: 插入补全后选词的公共前缀
+* `acm-insert-common`: 插入补全候选词的公共前缀
 * `acm-doc-scroll-up`: API 文档窗口向上滚动
 * `acm-doc-scroll-down`: API 文档窗口向下滚动
 
@@ -120,13 +123,15 @@ lsp-bridge 开箱即用， 安装好语言对应的[LSP 服务器](https://githu
 * `lsp-bridge-completion-popup-predicates`: 补全菜单显示的检查函数， 这个选项包括的所有函数都检查过以后， 补全菜单才能显示
 * `lsp-bridge-completion-stop-commands`: 这些命令执行以后，不再弹出补全菜单
 * `lsp-bridge-completion-hide-characters`: 这些字符的后面不再弹出补全菜单
+* `acm-frame-background-dark-color`: 暗色主题下的菜单背景颜色
+* `acm-frame-background-light-color`: 亮色主题下的菜单背景颜色
 * `acm-markdown-render-font-height`: 弹出文档的字体高度， 默认是 130
 * `acm-enable-doc`: 补全菜单是否显示帮助文档
 * `acm-enable-icon`: 补全菜单是否显示图标, macOS 用户需要给 brew 命令增加选项 `--with-rsvg` 来安装 Emacs 才能显示 SVG 图片
 * `acm-enable-doc-markdown-render`: 对补全文档中的 Markdown 内容进行语法着色， 你可以选择`'async`, `t` 或者 `nil`. 当选择`'async` 时, lsp-bridge 会采用异步渲， 当选择 `t` 时, lsp-bridge 会采用同步渲染， 同步渲染会降低补全速度， 默认是 `async` 选项
 * `acm-enable-tabnine`: 是否打开 tabnine 补全支持，默认打开，打开后需要运行命令 `lsp-bridge-install-tabnine` 来安装 tabnine 后就可以使用了。 TabNine 会消耗巨大的 CPU， 导致你整个电脑都卡顿， 如果电脑性能不好， 不建议开启此选项
 * `acm-enable-search-file-words`: 补全菜单是否显示打开文件的单词， 默认打开
-* `acm-enable-quick-access`: 是否在图标后面显示索引， 可以通过 Alt + Number 来快速选择后选词， 默认关闭
+* `acm-enable-quick-access`: 是否在图标后面显示索引， 可以通过 Alt + Number 来快速选择候选词， 默认关闭
 * `acm-enable-yas`: yasnippet 补全，默认打开
 * `acm-enable-citre`: [citre(ctags)](https://github.com/universal-ctags/citre) 补全，默认关闭
 * `acm-doc-frame-max-lines`: 帮助窗口的最大行数， 默认是 20
@@ -206,13 +211,13 @@ lsp-bridge 每种语言的服务器配置存储在[lsp-bridge/langserver](https:
 | [eclipse.jdt.ls](https://projects.eclipse.org/projects/eclipse.jdt.ls)                               | Java                                    | 请确保导出 `org.eclipse.jdt.ls.product/target/repository/bin` 到你系统的 PATH 路径                                                                                                    |
 | [clojure-lsp](https://github.com/clojure-lsp/clojure-lsp)                                            | Clojure                                 | 如果使用 `homebrew` 安装的，请确保安装的是 `clojure-lsp/brew/clojure-lsp-native` [clojure-lsp-native](https://clojure-lsp.io/installation/#homebrew-macos-and-linux)                  |
 | [bash-language-server](https://github.com/bash-lsp/bash-language-server)                             | Bash                                    |                                                                                                                                                                                       |
-| [volar](https://github.com/johnsoncodehk/volar)                                                      | Vue                                     | npm install -g typescript @volar/vue-language-server -g                                                                                                                               |
+| [volar](https://github.com/johnsoncodehk/volar)                                                      | Vue                                     | `npm install -g typescript @volar/vue-language-server`                                                                                                                               |
 | [sumneko](https://github.com/sumneko/lua-language-server)                                            | Lua                                     | 请确保导出 sumneko 的 `bin` 目录到你系统的 PATH 路径                                                                                                                                  |
 | [wxml-language-server](https://github.com/chemzqm/wxml-languageserver)                               | Wxml                                    |                                                                                                                                                                                       |
-| [vscode-html-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)               | HTML                                    | npm i -g vscode-langservers-extracted                                                                                                                                                 |
-| [vscode-css-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)                | CSS                                     | npm i -g vscode-langservers-extracted                                                                                                                                                 |
-| [vscode-eslint-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)             | JavaScript                              | npm i -g vscode-langservers-extracted                                                                                                                                                 |
-| [vscode-json-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)               | JSON                                    | npm i -g vscode-langservers-extracted                                                                                                                                                 |
+| [vscode-html-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)               | HTML                                    | `npm i -g vscode-langservers-extracted`                                                                                                                                                 |
+| [vscode-css-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)                | CSS                                     | `npm i -g vscode-langservers-extracted`                                                                                                                                                 |
+| [vscode-eslint-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)             | JavaScript                              | `npm i -g vscode-langservers-extracted`                                                                                                                                                 |
+| [vscode-json-language-server](https://github.com/hrsh7th/vscode-langservers-extracted)               | JSON                                    | `npm i -g vscode-langservers-extracted`                                                                                                                                                 |
 | [elm-language-server](https://github.com/elm-tooling/elm-language-server)                            | Elm                                     |                                                                                                                                                                                       |
 | [intelephense](https://github.com/bmewburn/vscode-intelephense)                                      | PHP                                     |                                                                                                                                                                                       |
 | [Phpactor](https://github.com/phpactor/phpactor)                                                     | PHP                                     | lsp-brige-php-lsp-server 设置成 `phpactor`                                                                                                                                            |
@@ -229,7 +234,8 @@ lsp-bridge 每种语言的服务器配置存储在[lsp-bridge/langserver](https:
 | [rlanguageserver](https://github.com/REditorSupport/languageserver)                                  | R                                       |                                                                                                                                                                                       |
 | [graphql-lsp](https://github.com/graphql/graphiql/tree/main/packages/graphql-language-service-cli)   | GraphQL                                 |                                                                                                                                                                                       |
 | [cmake-language-server](https://github.com/regen100/cmake-language-server)                           | Cmake                                   | `pip install cmake-language-server`                                                                                                                                                   |
-| [Wen](https://github.com/metaescape/Wen)                                                             | Org-mode                                | `pip install pygls pypinyin`                                                                                                                                                          |
+| [ds-pinyin](https://github.com/iamcco/ds-pinyin-lsp)                                                 | Org-mode                                | `cargo install ds-pinyin-lsp`, 下载 ds-pinyin 的 dict.db3 文件， 并保存到目录 ~/.emacs.d/ds-pinyin/ , 最后开启选项 `lsp-bridge-use-ds-pinyin-in-org-mode`                                                                                              |
+| [Wen](https://github.com/metaescape/Wen)                                                             | Org-mode                                | `pip install pygls pypinyin`, 开启选项 `lsp-bridge-use-wenls-in-org-mode`                                                                                                                                                          |
 | [sourcekit-lsp](https://github.com/apple/sourcekit-lsp)                                              | Swift                                   | Sourcekit-lsp 包含在 swift toolchain 中。                                                                                                                                             |
 | [omnisharp-mono](https://github.com/OmniSharp/omnisharp-roslyn)                                      | C#                                      | OmniSharp 是 .NET 开发平台, 使用命令 `M-x lsp-bridge-install-omnisharp` 来安 OmniSharp, 默认是 `omnisharp-mono`. `lsp-bridge-csharp-lsp-server` 设置成 `omnisharp-mono`               |
 | [omnisharp-dotnet](https://github.com/OmniSharp/omnisharp-roslyn)                                    | C#                                      | OmniSharp 是 .NET 开发平台, 使用命令 `M-x lsp-bridge-install-omnisharp` 来安 OmniSharp, 默认是 `omnisharp-mono`. `lsp-bridge-csharp-lsp-server` 设置成 `omnisharp-dotnet`             |
@@ -288,7 +294,7 @@ lsp-bridge 基于 Python 的多线程技术来构建补全后端， 有了多线
 (lsp-bridge-call-async "search_list_update" "example" (list "keyword_a" "keyword_b" "keyword_c") 100   "lsp-bridge-example-record")
 ```
 
-我们可以通过接口函数 `search_list_update` 快速把关键字列表缓存到 lsp-bridge 的 Python 进程， 其中 `example` 是补全后端的名字， `(list "keyword_a" "keyword_b" "keyword_c")` 是关键字列表， `100` 是搜索后选词的最大数目， `lsp-bridge-example-record` 是搜索完成后调用的回调函数名称。
+我们可以通过接口函数 `search_list_update` 快速把关键字列表缓存到 lsp-bridge 的 Python 进程， 其中 `example` 是补全后端的名字， `(list "keyword_a" "keyword_b" "keyword_c")` 是关键字列表， `100` 是搜索侯选词的最大数目， `lsp-bridge-example-record` 是搜索完成后调用的回调函数名称。
 
 #### 2. 多线程搜索过滤
 ```elisp
@@ -316,6 +322,8 @@ lsp-bridge 基于 Python 的多线程技术来构建补全后端， 有了多线
 6. 展示性能瓶颈： snakeviz ~/lsp-bridge.prof 
 
 ## 反馈问题
+
+关于一些常用问题， 请先阅读[Wiki](https://github.com/manateelazycat/lsp-bridge/wiki)
 
 请用命令 `emacs -q` 并只添加 lsp-bridge 配置做一个对比测试，如果 `emacs -q` 可以正常工作，请检查你个人的配置文件。
 
