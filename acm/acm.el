@@ -719,7 +719,7 @@ The key of candidate will change between two LSP results."
                         (+ cursor-y offset-y))))
     (acm-frame-set-frame-position acm-menu-frame acm-frame-x acm-frame-y)))
 
-(defun acm-doc-try-show ()
+(defun acm-doc-try-show (&optional update-completion-item)
   (when acm-enable-doc
     (let* ((candidate (acm-menu-current-candidate))
            (backend (plist-get candidate :backend))
@@ -727,8 +727,7 @@ The key of candidate will change between two LSP results."
            (candidate-doc
             (when (fboundp candidate-doc-func)
               (funcall candidate-doc-func candidate))))
-      (if (or (consp candidate-doc) ; If the type fo snippet is set to command,
-                                        ; then the "doc" will be a list.
+      (if (or (consp candidate-doc) ; If the type fo snippet is set to command, then the "doc" will be a list.
               (and (stringp candidate-doc) (not (string-empty-p candidate-doc))))
           (let ((doc (if (stringp candidate-doc)
                          candidate-doc
@@ -756,10 +755,12 @@ The key of candidate will change between two LSP results."
             ;; Adjust doc frame position and size.
             (acm-doc-frame-adjust))
 
-        ;; Hide doc frame immediately if backend is not LSP.
-        ;; If backend is LSP, doc frame hide is control by `lsp-bridge-completion-item--update'.
-        (unless (string-equal backend "lsp")
-          (acm-doc-hide))))))
+        (pcase backend
+          ;; If backend is LSP, doc frame hide when `update-completion-item' is t.
+          ("lsp" (when update-completion-item
+                   (acm-doc-hide)))
+          ;; Hide doc frame immediately if backend is not LSP.
+          (_ (acm-doc-hide)))))))
 
 (defun acm-doc-frame-adjust ()
   (let* ((emacs-width (frame-pixel-width))
@@ -976,8 +977,11 @@ The key of candidate will change between two LSP results."
       (setq-local markdown-fontify-code-blocks-natively t)
       (setq acm-markdown-render-background (face-background 'markdown-code-face))
       (setq acm-markdown-render-height (face-attribute 'markdown-code-face :height))
-      (face-remap-add-relative 'markdown-code-face :background (acm-frame-background-color))
-      (face-remap-add-relative 'markdown-code-face :height acm-markdown-render-font-height)
+      ;; NOTE:
+      ;; Please DON'T use `face-remap-add-relative' here, it's WRONG.
+      ;;
+      (set-face-background 'markdown-code-face (acm-frame-background-color))
+      (set-face-attribute 'markdown-code-face nil :height acm-markdown-render-font-height)
       (gfm-view-mode)))
   (read-only-mode 0)
   (setq prettify-symbols-alist acm-markdown-render-prettify-symbols-alist)
