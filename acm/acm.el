@@ -103,6 +103,8 @@
 (require 'acm-backend-tabnine)
 (require 'acm-backend-tailwind)
 (require 'acm-backend-citre)
+(require 'acm-backend-codeium)
+(require 'acm-backend-copilot)
 (require 'acm-quick-access)
 
 ;;; Code:
@@ -124,7 +126,7 @@
         ;; Avoid flashing completion menu when backward delete char
         grammatical-edit-backward-delete backward-delete-char-untabify
         python-indent-dedent-line-backspace delete-backward-char hungry-delete-backward
-        "\\`acm-" "\\`scroll-other-window" "\\`special-lispy-" "\\`lispy-")
+        "\\`acm-" "\\`scroll-other-window" "\\`special-lispy-" "\\`special-" "\\`lispy-")
   "Continue ACM completion after executing these commands."
   :type '(repeat (choice regexp symbol))
   :group 'acm)
@@ -151,11 +153,6 @@
   :type 'boolean
   :group 'acm)
 
-(defcustom acm-snippet-insert-index 8
-  "Insert index of snippet candidate of menu."
-  :type 'integer
-  :group 'acm)
-
 (defcustom acm-candidate-match-function 'regexp-quote
   "acm candidate match function."
   :type '(choice (const regexp-quote)
@@ -171,11 +168,6 @@
   :type 'integer
   :group 'acm)
 
-(defcustom acm-markdown-render-font-height 130
-  "Font size for hover tooltip."
-  :type 'integer
-  :group 'acm)
-
 (defcustom acm-frame-background-dark-color "#191a1b"
   "The frame background color for dark theme."
   :type 'string
@@ -186,10 +178,33 @@
   :type 'string
   :group 'acm)
 
+(defcustom acm-completion-backend-merge-order '("mode-first-part-candidates"
+                                                "template-first-part-candidates"
+                                                "tabnine-candidates"
+                                                "copilot-candidates"
+                                                "codeium-candidates"
+                                                "template-second-part-candidates"
+                                                "mode-second-part-candidates")
+  "The merge order for completion backend."
+  :type 'list
+  :group 'acm)
+
+(defcustom acm-enable-preview nil
+  "Enable tab-and-go preview."
+  :type 'boolean
+  :group 'acm)
+
 (cl-defmacro acm-run-idle-func (timer idle func)
   `(unless ,timer
      (setq ,timer
            (run-with-idle-timer ,idle t #'(lambda () (funcall ,func))))))
+
+(cl-defmacro acm-with-cache-candidates (cache-candidates &rest body)
+  `(if (and (boundp ',cache-candidates)
+            ,cache-candidates)
+       ,cache-candidates
+     (setq-local ,cache-candidates ,@body)
+     ,cache-candidates))
 
 (defvar acm-mode-map
   (let ((map (make-sparse-keymap)))
@@ -215,6 +230,16 @@
     (define-key map "\M-k" #'acm-doc-scroll-down)
     (define-key map "\M-l" #'acm-hide)
     (define-key map "\C-g" #'acm-hide)
+    (define-key map "1" #'acm-insert-number-or-complete-candiate)
+    (define-key map "2" #'acm-insert-number-or-complete-candiate)
+    (define-key map "3" #'acm-insert-number-or-complete-candiate)
+    (define-key map "4" #'acm-insert-number-or-complete-candiate)
+    (define-key map "5" #'acm-insert-number-or-complete-candiate)
+    (define-key map "6" #'acm-insert-number-or-complete-candiate)
+    (define-key map "7" #'acm-insert-number-or-complete-candiate)
+    (define-key map "8" #'acm-insert-number-or-complete-candiate)
+    (define-key map "9" #'acm-insert-number-or-complete-candiate)
+    (define-key map "0" #'acm-insert-number-or-complete-candiate)
     map)
   "Keymap used when popup is shown.")
 
@@ -239,6 +264,8 @@
 (defvar acm-doc-frame nil)
 (defvar acm-doc-frame-hide-p nil)
 (defvar acm-doc-buffer " *acm-doc-buffer*")
+
+(defvar acm-preview-overlay nil)
 
 (defface acm-deprecated-face
   '((t :inherit shadow :strike-through t))
@@ -345,15 +372,31 @@ Only calculate template candidate when type last character."
                                 (backward-char (length keyword))
                                 (acm-char-before)))
          (candidates (list))
+         (mode-candidates-min-index 2)
+         (template-candidates-min-index 2)
          lsp-candidates
          path-candidates
          yas-candidates
          tabnine-candidates
+         codeium-candidates
+         copilot-candidates
          tempel-candidates
          mode-candidates
+         mode-first-part-candidates
+         mode-second-part-candidates
+         mode-candidates-split-index
+         template-candidates
+         template-first-part-candidates
+         template-second-part-candidates
          citre-candidates)
     (when acm-enable-tabnine
       (setq tabnine-candidates (acm-backend-tabnine-candidates keyword)))
+
+    (when acm-enable-codeium
+      (setq codeium-candidates (acm-backend-codeium-candidates keyword)))
+
+    (when acm-enable-copilot
+      (setq copilot-candidates (acm-backend-copilot-candidates keyword)))
 
     (if acm-enable-search-sdcv-words
         ;; Completion SDCV if option `acm-enable-search-sdcv-words' is enable.
@@ -402,16 +445,42 @@ Only calculate template candidate when type last character."
             (acm-cancel-timer acm-template-candidate-timer)
             (setq acm-template-candidate-timer (run-with-timer 0.2 nil #'acm-template-candidate-update)))))
 
-        ;; Insert snippet candidates in first page of menu.
-        (setq candidates
-              (if (> (length mode-candidates) acm-snippet-insert-index)
-                  (append (cl-subseq mode-candidates 0 acm-snippet-insert-index)
-                          yas-candidates
-                          tempel-candidates
-                          (cl-subseq mode-candidates acm-snippet-insert-index)
-                          tabnine-candidates)
-                (append mode-candidates yas-candidates tempel-candidates tabnine-candidates)
-                ))))
+        ;; Build template candidates.
+        ;; And make sure show part of template candidates in first completion menu.
+        (setq template-candidates (append yas-candidates tempel-candidates))
+        (if (> (length template-candidates) template-candidates-min-index)
+            (progn
+              (setq template-first-part-candidates (cl-subseq template-candidates 0 template-candidates-min-index))
+              (setq template-second-part-candidates (cl-subseq template-candidates template-candidates-min-index)))
+          (setq template-first-part-candidates template-candidates)
+          (setq template-second-part-candidates nil))
+
+        ;; Make sure show part of TabNine candidates in first completion menu.
+        (setq mode-candidates-split-index
+              (max (- acm-menu-length (+ (length template-first-part-candidates) (length tabnine-candidates)))
+                   mode-candidates-min-index))
+
+        ;; Build mode candidates.
+        (if (> (length mode-candidates) mode-candidates-split-index)
+            (progn
+              (setq mode-first-part-candidates (cl-subseq mode-candidates 0 mode-candidates-split-index))
+              (setq mode-second-part-candidates (cl-subseq mode-candidates mode-candidates-split-index)))
+          (setq mode-first-part-candidates mode-candidates)
+          (setq mode-second-part-candidates nil))
+
+        ;; Build all backend candidates.
+        (setq candidates (apply #'append (mapcar (lambda (backend-name)
+                                                   (pcase backend-name
+                                                     ("mode-first-part-candidates" mode-first-part-candidates)
+                                                     ("template-first-part-candidates" template-first-part-candidates)
+                                                     ("tabnine-candidates" tabnine-candidates)
+                                                     ("codeium-candidates" codeium-candidates)
+                                                     ("copilot-candidates" copilot-candidates)
+                                                     ("template-second-part-candidates" template-second-part-candidates)
+                                                     ("mode-second-part-candidates" mode-second-part-candidates)
+                                                     ))
+                                                 acm-completion-backend-merge-order))
+              )))
 
     ;; Return candidates.
     (if acm-filter-overlay
@@ -427,7 +496,7 @@ Only calculate template candidate when type last character."
 The key of candidate will change between two LSP results."
   (format "%s###%s" (plist-get candidate :label) (plist-get candidate :backend)))
 
-(defun acm-update ()
+(defun acm-update (&optional candidate)
   ;; Init quick mode map.
   (acm-quick-access-init)
 
@@ -437,7 +506,7 @@ The key of candidate will change between two LSP results."
          (keyword (acm-get-input-prefix))
          (previous-select-candidate-index (+ acm-menu-offset acm-menu-index))
          (previous-select-candidate (acm-menu-index-info (acm-menu-current-candidate)))
-         (candidates (acm-update-candidates))
+         (candidates (or candidate (acm-update-candidates)))
          (menu-candidates (cl-subseq candidates 0 (min (length candidates) acm-menu-length)))
          (current-select-candidate-index (cl-position previous-select-candidate (mapcar 'acm-menu-index-info menu-candidates) :test 'equal))
          (bounds (acm-get-input-prefix-bound)))
@@ -495,7 +564,8 @@ The key of candidate will change between two LSP results."
         ;; `posn-at-point' will failed in CI, add checker make sure CI can pass.
         ;; CI don't need popup completion menu.
         (when (posn-at-point acm-menu-frame-popup-point)
-          (setq acm-menu-frame-popup-position (acm-frame-get-popup-position acm-menu-frame-popup-point))
+          (setq acm-menu-frame-popup-position
+                (acm-frame-get-popup-position acm-menu-frame-popup-point))
 
           ;; We need delete frame first when user switch to different frame.
           (when (and (frame-live-p acm-menu-frame)
@@ -538,7 +608,8 @@ The key of candidate will change between two LSP results."
 
 (defun acm-hide ()
   (interactive)
-  (let* ((candidate-info (acm-menu-current-candidate))
+  (let* ((completion-menu-is-show-p (acm-frame-visible-p acm-menu-frame))
+         (candidate-info (acm-menu-current-candidate))
          (backend (plist-get candidate-info :backend)))
     ;; Turn off `acm-mode'.
     (acm-mode -1)
@@ -555,13 +626,22 @@ The key of candidate will change between two LSP results."
     ;; Clean `acm-menu-max-length-cache'.
     (setq acm-menu-max-length-cache 0)
 
+    (when acm-preview-overlay
+      (if (not (eq this-command 'acm-hide))
+          ;; if `acm-hide' is called as command, not insert
+          (acm-complete t)
+        (delete-overlay acm-preview-overlay)
+        (setq acm-preview-overlay nil)))
+
     ;; Remove hook of `acm--pre-command'.
     (remove-hook 'pre-command-hook #'acm--pre-command 'local)
 
-    ;; Clean backend cache.
-    (when-let* ((backend-clean (intern-soft (format "acm-backend-%s-clean" backend)))
-                (fp (fboundp backend-clean)))
-      (funcall backend-clean))))
+    ;; If completion menu is show, clean backend cache.
+    ;; Don't clean backend cache if menu is hide, to make sure completion menu have candidate when call command `lsp-bridge-popup-complete-menu'.
+    (when completion-menu-is-show-p
+      (when-let* ((backend-clean (intern-soft (format "acm-backend-%s-clean" backend)))
+                  (fp (fboundp backend-clean)))
+        (funcall backend-clean)))))
 
 (defun acm-running-in-wayland-native ()
   (and (eq window-system 'pgtk)
@@ -589,19 +669,59 @@ The key of candidate will change between two LSP results."
   (unless (acm-match-symbol-p acm-continue-commands this-command)
     (acm-hide)))
 
-(defun acm-complete ()
+(defun acm-complete (&optional not-hide)
   (interactive)
   (let* ((candidate-info (acm-menu-current-candidate))
          (bound-start acm-menu-frame-popup-point)
          (backend (plist-get candidate-info :backend))
          (candidate-expand (intern-soft (format "acm-backend-%s-candidate-expand" backend))))
+
     (if (fboundp candidate-expand)
         (funcall candidate-expand candidate-info bound-start)
       (delete-region bound-start (point))
       (insert (plist-get candidate-info :label))))
 
+  (when (overlayp acm-preview-overlay)
+    (delete-overlay acm-preview-overlay))
+  (setq acm-preview-overlay nil)
+
   ;; Hide menu and doc frame after complete candidate.
-  (acm-hide))
+  (unless not-hide
+    (acm-hide)))
+
+(defun acm-preview-create-overlay (beg end display)
+  (let ((ov (make-overlay beg end nil)))
+    (overlay-put ov 'priority 1000)
+    (overlay-put ov 'window (selected-window))
+    (when (stringp display)
+      (overlay-put ov 'display display))
+    ov))
+
+(defun acm-preview-current ()
+  "Show current candidate as overlay given BEG and END."
+  (let* ((candidate-info (acm-menu-current-candidate))
+         (beg acm-menu-frame-popup-point)
+         (cand (plist-get candidate-info :label))
+         (end (+ beg (length cand)))
+         (backend (plist-get candidate-info :backend))
+         (candidate-expand (intern-soft (format "acm-backend-%s-candidate-expand" backend))))
+    (when acm-preview-overlay (delete-overlay acm-preview-overlay))
+    (if (and (fboundp candidate-expand)
+             ;; check if candidate-expand support preview.
+             (let ((doc (documentation candidate-expand t)))
+               (if doc
+                   (string-match " PREVIEW" doc)
+                 (member 'preview (help-function-arglist candidate-expand)))))
+        (save-excursion
+          (setq acm-preview-overlay (funcall candidate-expand candidate-info beg t)))
+      (setq acm-preview-overlay (acm-preview-create-overlay beg (point) cand)))
+    ;; adjust pos of menu frame.
+    (when-let ((popup-pos (acm-frame-get-popup-position
+                           acm-menu-frame-popup-point
+                           (1- (length (split-string (overlay-get acm-preview-overlay 'display) "\n")))))
+               ((not (eq (cdr popup-pos) (cdr acm-menu-frame-popup-position)))))
+      (setcdr acm-menu-frame-popup-position (cdr popup-pos))
+      (acm-menu-adjust-pos))))
 
 (defun acm-complete-or-expand-yas-snippet ()
   "Do complete or expand yasnippet, you need binding this funtion to `<tab>' in `yas-keymap'."
@@ -712,11 +832,18 @@ The key of candidate will change between two LSP results."
          (offset-x (* (window-font-width) acm-icon-width))
          (offset-y (line-pixel-height))
          (acm-frame-x (if (> (+ cursor-x acm-frame-width) emacs-width)
-                          (max  (- cursor-x acm-frame-width) offset-x)
+                          (max (- cursor-x acm-frame-width) offset-x)
                         (max (- cursor-x offset-x) 0)))
-         (acm-frame-y (if (> (+ cursor-y acm-frame-height) emacs-height)
-                          (- cursor-y acm-frame-height)
-                        (+ cursor-y offset-y))))
+         (acm-frame-y (cond
+                       ;; Always popup up when cursor in minibuffer.
+                       ((minibufferp)
+                        (- (nth 1 (window-pixel-edges (minibuffer-window))) acm-frame-height))
+                       ;; Popup up when acm menu bottom below at Emacs bottom edge.
+                       ((> (+ cursor-y acm-frame-height) emacs-height)
+                        (- cursor-y acm-frame-height))
+                       ;; Otherwise, popup down.
+                       (t
+                        (+ cursor-y offset-y)))))
     (acm-frame-set-frame-position acm-menu-frame acm-frame-x acm-frame-y)))
 
 (defun acm-doc-try-show (&optional update-completion-item)
@@ -738,12 +865,13 @@ The key of candidate will change between two LSP results."
 
             ;; Insert documentation and turn on wrap line.
             (with-current-buffer (get-buffer-create acm-doc-buffer)
+              (read-only-mode -1)
               (erase-buffer)
               (insert doc)
               (visual-line-mode 1))
 
             ;; Only render markdown styling when idle 200ms, because markdown render is expensive.
-            (when (string-equal backend "lsp")
+            (when (member backend '("lsp" "codeium" "copilot"))
               (acm-cancel-timer acm-markdown-render-timer)
               (cl-case acm-enable-doc-markdown-render
                 (async (setq acm-markdown-render-timer
@@ -787,7 +915,7 @@ The key of candidate will change between two LSP results."
 
     ;; Adjust doc frame with it's size.
     (let* ((acm-doc-frame-width (frame-pixel-width acm-doc-frame))
-           (acm-doc-frame-x (if (> acm-frame-left-distance acm-frame-right-distance)
+           (acm-doc-frame-x (if (> (+ acm-frame-x acm-frame-width acm-doc-frame-max-width) emacs-width)
                                 (- acm-frame-x acm-doc-frame-width)
                               (+ acm-frame-x acm-frame-width)))
            (acm-doc-frame-y acm-frame-y))
@@ -825,6 +953,7 @@ The key of candidate will change between two LSP results."
         (acm-doc-frame-adjust)))
 
     ;; Adjust menu frame position.
+    ;; We need adjust acm menu position after set it size, avoid coordinate shifts due to resizing.
     (acm-menu-adjust-pos)
 
     ;; Fetch `documentation' and `additionalTextEdits' information.
@@ -866,17 +995,24 @@ The key of candidate will change between two LSP results."
      (when (or (not (equal menu-old-index acm-menu-index))
                (not (equal menu-old-offset acm-menu-offset)))
        (acm-menu-update-candidates)
-       (acm-menu-render menu-old-cache)
-       )))
+       (acm-menu-render menu-old-cache))
+     (when acm-enable-preview
+       (acm-preview-current))
+     ))
 
 (defun acm-char-before ()
   (let ((prev-char (char-before)))
     (if prev-char (char-to-string prev-char) "")))
 
+(defvar-local acm-is-elisp-mode-in-org nil)
 (defun acm-is-elisp-mode-p ()
   (or (derived-mode-p 'emacs-lisp-mode)
       (derived-mode-p 'inferior-emacs-lisp-mode)
-      (derived-mode-p 'lisp-interaction-mode)))
+      (derived-mode-p 'lisp-interaction-mode)
+      (and (eq major-mode 'org-mode)
+           acm-is-elisp-mode-in-org)
+      (and (minibufferp)
+           (where-is-internal #'completion-at-point (list (current-local-map))))))
 
 (defun acm-select-first ()
   "Select first candidate."
@@ -954,8 +1090,6 @@ The key of candidate will change between two LSP results."
 
 (defvar acm-markdown-render-timer nil)
 (defvar acm-markdown-render-doc nil)
-(defvar acm-markdown-render-background nil)
-(defvar acm-markdown-render-height nil)
 
 (defvar acm-markdown-render-prettify-symbols-alist
   (nconc
@@ -974,49 +1108,73 @@ The key of candidate will change between two LSP results."
 (defun acm-markdown-render-content ()
   (when (fboundp 'gfm-view-mode)
     (let ((inhibit-message t))
-      (setq-local markdown-fontify-code-blocks-natively t)
-      (setq acm-markdown-render-background (face-background 'markdown-code-face))
-      (setq acm-markdown-render-height (face-attribute 'markdown-code-face :height))
-      ;; NOTE:
-      ;; Please DON'T use `face-remap-add-relative' here, it's WRONG.
-      ;;
-      (set-face-background 'markdown-code-face (acm-frame-background-color))
-      (set-face-attribute 'markdown-code-face nil :height acm-markdown-render-font-height)
-      (gfm-view-mode)))
+      ;; Enable `gfm-view-mode' first, otherwise `gfm-view-mode' will change attribute of face `markdown-code-face'.
+      (gfm-view-mode)
+
+      ;; Then remapping background and height of `markdown-code-face' to same as acm doc buffer.
+      (face-remap-add-relative 'markdown-code-face :background (face-attribute 'default :background acm-menu-frame))
+      ))
+
   (read-only-mode 0)
+
+  ;; Enable prettify-symbols.
   (setq prettify-symbols-alist acm-markdown-render-prettify-symbols-alist)
   (setq prettify-symbols-compose-predicate (lambda (_start _end _match) t))
   (prettify-symbols-mode 1)
+
+  ;; Disable line number.
   (display-line-numbers-mode -1)
+
+  ;; Syntax Highlight.
   (font-lock-ensure)
 
+  ;; Disable mode line.
   (setq-local mode-line-format nil))
 
 (defun acm-doc-markdown-render-content (doc)
   (when (and (acm-frame-visible-p acm-doc-frame)
              (not (string-equal doc acm-markdown-render-doc)))
     (with-current-buffer (get-buffer-create acm-doc-buffer)
+      (read-only-mode -1)
       (acm-markdown-render-content))
 
-    (setq acm-markdown-render-doc doc)))
+    (setq acm-markdown-render-doc doc)
+
+    ;; We need `acm-doc-frame-adjust' again if `acm-enable-doc-markdown-render' is `async'.
+    ;; otherwise, `gfm-view-mode' will remove ``` line.
+    (cl-case acm-enable-doc-markdown-render
+      (async (acm-doc-frame-adjust))
+      )))
 
 (defun acm-in-comment-p (&optional state)
-  (ignore-errors
-    (unless (or (bobp) (eobp))
-      (save-excursion
-        (or
-         (nth 4 (or state (acm-current-parse-state)))
-         (eq (get-text-property (point) 'face) 'font-lock-comment-face))
-        ))))
+  (if (and (featurep 'treesit) (treesit-available-p) (treesit-parser-list))
+      ;; Avoid use `acm-current-parse-state' when treesit is enable.
+      ;; `beginning-of-defun' is very expensive function will slow down completion menu.
+      ;; We use `treesit-node-type' directly if treesit is enable.
+      (or (eq (get-text-property (point) 'face) 'font-lock-comment-face)
+          (string-equal (treesit-node-type (treesit-node-at (point))) "comment"))
+    (ignore-errors
+      (unless (or (bobp) (eobp))
+        (save-excursion
+          (or
+           (nth 4 (or state (acm-current-parse-state)))
+           (eq (get-text-property (point) 'face) 'font-lock-comment-face))
+          )))))
 
 (defun acm-in-string-p (&optional state)
-  (ignore-errors
-    (unless (or (bobp) (eobp))
-      (save-excursion
-        (and
-         (nth 3 (or state (acm-current-parse-state)))
-         (not (equal (point) (line-end-position))))
-        ))))
+  (if (and (featurep 'treesit) (treesit-available-p) (treesit-parser-list))
+      ;; Avoid use `acm-current-parse-state' when treesit is enable.
+      ;; `beginning-of-defun' is very expensive function will slow down completion menu.
+      ;; We use `treesit-node-type' directly if treesit is enable.
+      (or (eq (get-text-property (point) 'face) 'font-lock-string-face)
+          (string-equal (treesit-node-type (treesit-node-at (point))) "string"))
+    (ignore-errors
+      (unless (or (bobp) (eobp))
+        (save-excursion
+          (and
+           (nth 3 (or state (acm-current-parse-state)))
+           (not (equal (point) (line-end-position))))
+          )))))
 
 (defun acm-current-parse-state ()
   (let ((point (point)))
